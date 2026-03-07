@@ -342,7 +342,7 @@ async function addOvertime(p){const c=computeOvertime(p.date,p.start,p.end);awai
 async function addRecup(p){await db.collection('recups').add({uid:uid(),horodatage:new Date().toISOString(),date:p.date,annee:Number(p.date.slice(0,4)),heures:round_(Number(p.hours),3),commentaire:p.comment||''});}
 async function getSummary(){
   const u=uid();
-  const[sO,sR]=await Promise.all([db.collection('heuressupp').where('uid','==',u).orderBy('date','desc').get(),db.collection('recups').where('uid','==',u).orderBy('date','desc').get()]);
+  const[sO,sR]=await Promise.all([db.collection('heuressupp').where('uid','==',u).get(),db.collection('recups').where('uid','==',u).get()]);
   let tR=0,tC=0;const oR=[];sO.forEach(d=>{const v=d.data();tR+=Number(v.dureeReelle||0);tC+=Number(v.dureeComptabilisee||0);oR.push(v);});
   let tRc=0;const rR=[];sR.forEach(d=>{const v=d.data();tRc+=Number(v.heures||0);rR.push(v);});
   oR.sort((a,b)=>(b.date+b.debut)>(a.date+a.debut)?1:-1);rR.sort((a,b)=>b.date>a.date?1:-1);
@@ -390,8 +390,8 @@ async function exportPdf(){
   const yv=document.getElementById('pdfYear').value,year=yv?Number(yv):null;
   document.getElementById('pdfResult').innerHTML='';toast('Génération du PDF…','');
   try{
-    const snap=await db.collection('heuressupp').where('uid','==',uid()).orderBy('date').get();
-    let rows=[];snap.forEach(d=>rows.push(d.data()));if(year)rows=rows.filter(r=>Number(r.annee)===year);
+    const snap=await db.collection('heuressupp').where('uid','==',uid()).get();
+    let rows=[];snap.forEach(d=>rows.push(d.data()));rows.sort((a,b)=>(a.date+a.debut)>(b.date+b.debut)?1:-1);if(year)rows=rows.filter(r=>Number(r.annee)===year);
     const{jsPDF}=window.jspdf,doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
     doc.setFontSize(18);doc.setFont(undefined,'bold');doc.text("Heures supplémentaires d'Anthony Lemoine",14,20);
     doc.setFontSize(12);doc.setFont(undefined,'bold');doc.text(year?`Année : ${year}`:'Toutes années',14,29);
