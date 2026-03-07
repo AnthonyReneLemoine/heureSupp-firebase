@@ -1,0 +1,835 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <base target="_top">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Heures supp & récup</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+
+  <style>
+    body { background: #f5f7fb; }
+    .app-container { max-width: 1050px; margin: 0 auto; padding: 18px 12px 40px; }
+    .card { border-radius: 16px; }
+    .brand { display:flex; gap:12px; align-items:center; }
+    .brand .title { font-size: 1.25rem; font-weight: 700; }
+    .kpi { display:grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+    .kpi .k { padding: 14px 14px; border-radius: 14px; background: #ffffff; border: 1px solid rgba(0,0,0,0.06); }
+    .kpi .k .label { font-size: 0.85rem; opacity: 0.7; }
+    .kpi .k .val { font-size: 1.55rem; font-weight: 700; margin-top: 4px; }
+    .muted { opacity: 0.8; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+    .logs { display:grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    @media (max-width: 860px) {
+      .kpi { grid-template-columns: 1fr 1fr; }
+      .logs { grid-template-columns: 1fr; }
+    }
+    .chip.small { height: 22px; line-height: 22px; font-size: 12px; }
+    .toast { border-radius: 14px; }
+    .input-field input[type=text],
+    .input-field input[type=number],
+    .input-field input[type=date],
+    .input-field input[type=time] {
+      background:#fff; border-radius: 10px; padding-left: 12px; padding-right: 12px;
+      box-sizing: border-box; border: 1px solid rgba(0,0,0,0.10);
+    }
+    .input-field input:focus { border-bottom: 1px solid rgba(0,0,0,0.15) !important; box-shadow: none !important; }
+    .input-field label { left: 12px; }
+    input.valid, input.invalid { border-bottom: none !important; box-shadow: none !important; }
+    .tabs .tab a { font-weight: 600; }
+    .tabs { border-radius: 14px; overflow:hidden; }
+    .btn, .btn-large { border-radius: 12px; text-transform:none; font-weight:700; }
+    .btn-flat { border-radius: 10px; text-transform:none; }
+    .card-title { font-weight: 800 !important; }
+    .log-card { padding: 14px; border-radius: 14px; background:#fff; border: 1px solid rgba(0,0,0,0.06); }
+    .log-item { padding: 10px 0; border-bottom: 1px solid rgba(0,0,0,0.06); }
+    .log-item:last-child { border-bottom:none; }
+    .right-actions { display:flex; gap:10px; justify-content:flex-end; align-items:center; flex-wrap:wrap; }
+    .hint { font-size: 0.92rem; }
+    .small-note { font-size: 0.85rem; opacity: 0.75; }
+    .export-bar { display:flex; gap:10px; align-items:center; flex-wrap:wrap; justify-content:flex-start; margin-top:14px; gap: 12px; }
+    .export-bar .input-field { margin:0; width: 200px; }
+    .export-bar button { white-space: nowrap; }
+    .export-link { font-size: 0.9rem; }
+    .breakall { word-break: break-all; overflow-wrap: anywhere; }
+    .log-header { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+    .log-header .titlewrap { flex: 1; min-width: 220px; }
+    .log-header .actions { flex: 0 0 auto; display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+    .conn-block { margin-top:10px; padding:10px 12px; border-radius:12px; background:#f8fafc; border:1px solid rgba(0,0,0,0.06); }
+    .conn-grid { display:grid; grid-template-columns: 1fr auto; gap:8px; align-items:center; }
+    .conn-grid .input-field { min-width: 260px; }
+    .conn-grid button { white-space: nowrap; }
+    @media (max-width: 600px) {
+      .conn-grid { grid-template-columns: 1fr; }
+      .conn-grid .input-field { min-width: 0; }
+    }
+    .logs { grid-template-columns: 1fr 1fr; }
+    @media (max-width: 1000px) { .logs { grid-template-columns: 1fr; } }
+    .card-title { font-size: 1.25rem; line-height: 1.35; }
+    .log-card { overflow:hidden; }
+
+    /* Firebase config modal */
+    #configModal { position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:9999; display:flex; align-items:center; justify-content:center; }
+    #configModal .modal-box { background:#fff; border-radius:16px; padding:28px; max-width:540px; width:90%; box-shadow:0 8px 40px rgba(0,0,0,0.18); }
+    #configModal h5 { margin:0 0 8px; font-weight:800; }
+    #configModal p { font-size:0.9rem; opacity:0.75; margin:0 0 16px; }
+    #configModal .input-field { margin-bottom: 0; }
+    #configModal input { background:#f5f7fb !important; border-radius:8px; padding-left:12px !important; }
+    #configModal label { left:12px !important; }
+    #configModal .actions { display:flex; justify-content:flex-end; gap:10px; margin-top:16px; }
+    .config-status { font-size:0.85rem; margin-top:10px; padding:8px 12px; border-radius:10px; }
+    .config-status.ok { background:#d1fae5; color:#065f46; }
+    .config-status.err { background:#fee2e2; color:#991b1b; }
+  </style>
+</head>
+<body>
+
+<!-- Modal config Firebase (premier lancement) -->
+<div id="configModal" style="display:none;">
+  <div class="modal-box">
+    <h5><i class="material-icons" style="vertical-align:middle;margin-right:6px;font-size:1.2rem;">settings</i>Configuration Firebase</h5>
+    <p>Renseignez les paramètres de votre projet Firebase. Ces valeurs sont stockées localement dans votre navigateur.</p>
+    <div class="row" style="margin-bottom:0;">
+      <div class="col s12">
+        <div class="input-field">
+          <input id="cfg_apiKey" type="text" class="mono">
+          <label class="active" for="cfg_apiKey">API Key</label>
+        </div>
+      </div>
+      <div class="col s12">
+        <div class="input-field">
+          <input id="cfg_projectId" type="text" class="mono">
+          <label class="active" for="cfg_projectId">Project ID</label>
+        </div>
+      </div>
+      <div class="col s12">
+        <div class="input-field">
+          <input id="cfg_appId" type="text" class="mono">
+          <label class="active" for="cfg_appId">App ID</label>
+        </div>
+      </div>
+    </div>
+    <div id="configStatus" class="config-status" style="display:none;"></div>
+    <div class="actions">
+      <button class="btn-flat" onclick="closeConfigModal()">Annuler</button>
+      <button class="btn" onclick="saveFirebaseConfig()">Enregistrer et connecter</button>
+    </div>
+  </div>
+</div>
+
+<div class="app-container">
+  <div class="brand">
+    <i class="material-icons">schedule</i>
+    <div class="title">Heures supp & récup</div>
+    <div class="chip small">Firebase · GitHub Pages</div>
+  </div>
+
+  <!-- KPIs -->
+  <div class="card" style="margin-top:14px;">
+    <div class="card-content">
+      <div class="kpi">
+        <div class="k">
+          <div class="label">Heures réelles (supp)</div>
+          <div class="val mono" id="kpiReal">—</div>
+        </div>
+        <div class="k">
+          <div class="label">Heures comptabilisées</div>
+          <div class="val mono" id="kpiCounted">—</div>
+        </div>
+        <div class="k">
+          <div class="label">Récup prises</div>
+          <div class="val mono" id="kpiRecup">—</div>
+        </div>
+        <div class="k">
+          <div class="label">Solde</div>
+          <div class="val mono" id="kpiBalance">—</div>
+        </div>
+      </div>
+      <div class="small-note" style="margin-top:10px;">
+        Règles : jour férié = ×2 ; après 22h = ×2 ; dimanche avant 22h = ×1,667. Saisie : tranches de 15 minutes.
+      </div>
+    </div>
+  </div>
+
+  <!-- Onglets -->
+  <div class="card" style="margin-top:12px;">
+    <div class="card-content" style="padding-bottom:0;">
+      <ul class="tabs tabs-fixed-width">
+        <li class="tab"><a class="active" href="#tabOvertime">Ajouter heures supp</a></li>
+        <li class="tab"><a href="#tabRecup">Ajouter récup</a></li>
+        <li class="tab"><a href="#tabLogs">Derniers logs / export</a></li>
+      </ul>
+    </div>
+
+    <!-- Onglet Heures supp -->
+    <div id="tabOvertime" class="card-content">
+      <div class="row">
+        <div class="col s12 m4">
+          <div class="input-field">
+            <input id="otDate" type="date">
+            <label class="active" for="otDate">Date</label>
+          </div>
+        </div>
+        <div class="col s12 m4">
+          <div class="input-field">
+            <input id="otStart" type="time" step="900">
+            <label class="active" for="otStart">Début</label>
+          </div>
+        </div>
+        <div class="col s12 m4">
+          <div class="input-field">
+            <input id="otEnd" type="time" step="900">
+            <label class="active" for="otEnd">Fin</label>
+          </div>
+        </div>
+        <div class="col s12">
+          <div class="input-field">
+            <input id="otComment" type="text" maxlength="120">
+            <label class="active" for="otComment">Commentaire (optionnel)</label>
+          </div>
+        </div>
+        <div class="col s12">
+          <div class="right-actions">
+            <a class="btn-flat" href="javascript:void(0)" onclick="fillNow('ot')">Mettre aujourd'hui</a>
+            <button class="btn" onclick="submitOvertime()">Enregistrer</button>
+          </div>
+          <div class="hint muted" style="margin-top:10px;">
+            Si la fin est inférieure ou égale au début, le créneau est considéré comme passant minuit.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Onglet Récup -->
+    <div id="tabRecup" class="card-content">
+      <div class="row">
+        <div class="col s12 m6">
+          <div class="input-field">
+            <input id="reDate" type="date">
+            <label class="active" for="reDate">Date</label>
+          </div>
+        </div>
+        <div class="col s12 m6">
+          <div class="input-field">
+            <input id="reHours" type="number" min="0" step="0.25" inputmode="decimal">
+            <label class="active" for="reHours">Heures de récup prises (h comptabilisées)</label>
+          </div>
+        </div>
+        <div class="col s12">
+          <div class="input-field">
+            <input id="reComment" type="text" maxlength="120">
+            <label class="active" for="reComment">Commentaire (optionnel)</label>
+          </div>
+        </div>
+        <div class="col s12">
+          <div class="right-actions">
+            <a class="btn-flat" href="javascript:void(0)" onclick="fillNow('re')">Mettre aujourd'hui</a>
+            <button class="btn" onclick="submitRecup()">Enregistrer</button>
+          </div>
+          <div class="hint muted" style="margin-top:10px;">
+            Saisir en heures « comptabilisées » (équivalent), pas en heures réelles.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Onglet Logs / Export -->
+    <div id="tabLogs" class="card-content">
+      <div class="logs">
+
+        <!-- Log heures supp -->
+        <div class="log-card">
+          <div class="log-header">
+            <div class="titlewrap">
+              <div class="card-title" style="margin:0;">Heures supp (10 derniers)</div>
+            </div>
+            <div class="actions">
+              <a class="btn-flat" href="javascript:void(0)" onclick="refresh()">Rafraîchir</a>
+            </div>
+          </div>
+
+          <!-- Connexion Firebase -->
+          <div class="conn-block">
+            <div class="small-note breakall" id="connInfo">—</div>
+            <div class="conn-grid" style="margin-top:10px;">
+              <div class="input-field" style="margin:0; width:100%;">
+                <input id="sheetId" type="text" class="mono breakall" placeholder="(non utilisé — données dans Firebase)">
+                <label class="active" for="sheetId">Projet Firebase connecté</label>
+              </div>
+              <button class="btn-flat" onclick="openConfigModal()">Reconfigurer</button>
+            </div>
+          </div>
+
+          <div id="logOvertime" class="small-note" style="margin-top:10px;">Chargement…</div>
+
+          <!-- Export PDF -->
+          <div class="export-bar">
+            <div class="input-field">
+              <input id="pdfYear" type="number" min="1900" max="3000">
+              <label class="active" for="pdfYear">Année (optionnel)</label>
+            </div>
+            <button class="btn" onclick="exportPdf()">Exporter PDF</button>
+          </div>
+          <div id="pdfResult" class="export-link" style="margin-top:8px;"></div>
+        </div>
+
+        <!-- Log récup -->
+        <div class="log-card">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <div class="card-title" style="margin:0;">Récup (10 dernières)</div>
+            <a class="btn-flat" href="javascript:void(0)" onclick="refresh()">Rafraîchir</a>
+          </div>
+          <div id="logRecup" class="small-note" style="margin-top:6px;">Chargement…</div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Firebase SDK (compat v9) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
+
+<!-- jsPDF pour l'export PDF côté client -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+
+<script>
+// ─────────────────────────────────────────────────────────
+// FIREBASE CONFIG (stockée dans localStorage)
+// ─────────────────────────────────────────────────────────
+const LS_KEY = 'hsrecup_firebase_cfg';
+let db = null;
+
+function loadFirebaseConfig() {
+  try { return JSON.parse(localStorage.getItem(LS_KEY) || 'null'); } catch(e) { return null; }
+}
+function saveFirebaseConfigToLS(cfg) {
+  localStorage.setItem(LS_KEY, JSON.stringify(cfg));
+}
+
+function initFirebase(cfg) {
+  try {
+    // Détruire l'app existante si déjà initialisée
+    const existing = firebase.apps.find(a => a.name === '[DEFAULT]');
+    if (existing) existing.delete();
+  } catch(e) {}
+
+  try {
+    firebase.initializeApp({
+      apiKey: cfg.apiKey,
+      authDomain: cfg.projectId + '.firebaseapp.com',
+      projectId: cfg.projectId,
+      appId: cfg.appId
+    });
+    db = firebase.firestore();
+    return true;
+  } catch(e) {
+    console.error('Firebase init error:', e);
+    return false;
+  }
+}
+
+function openConfigModal() {
+  const cfg = loadFirebaseConfig() || {};
+  document.getElementById('cfg_apiKey').value = cfg.apiKey || '';
+  document.getElementById('cfg_projectId').value = cfg.projectId || '';
+  document.getElementById('cfg_appId').value = cfg.appId || '';
+  document.getElementById('configStatus').style.display = 'none';
+  document.getElementById('configModal').style.display = 'flex';
+}
+
+function closeConfigModal() {
+  document.getElementById('configModal').style.display = 'none';
+}
+
+async function saveFirebaseConfig() {
+  const cfg = {
+    apiKey: document.getElementById('cfg_apiKey').value.trim(),
+    projectId: document.getElementById('cfg_projectId').value.trim(),
+    appId: document.getElementById('cfg_appId').value.trim()
+  };
+  if (!cfg.apiKey || !cfg.projectId || !cfg.appId) {
+    showConfigStatus('Tous les champs sont requis.', false);
+    return;
+  }
+  const ok = initFirebase(cfg);
+  if (!ok) { showConfigStatus('Erreur initialisation Firebase.', false); return; }
+  // Test de connexion
+  try {
+    await db.collection('heuressupp').limit(1).get();
+    saveFirebaseConfigToLS(cfg);
+    showConfigStatus('Connexion réussie !', true);
+    setTimeout(() => {
+      closeConfigModal();
+      updateConnInfo();
+      refresh();
+    }, 900);
+  } catch(e) {
+    showConfigStatus('Erreur connexion : ' + (e.message || String(e)), false);
+  }
+}
+
+function showConfigStatus(msg, ok) {
+  const el = document.getElementById('configStatus');
+  el.textContent = msg;
+  el.className = 'config-status ' + (ok ? 'ok' : 'err');
+  el.style.display = 'block';
+}
+
+function updateConnInfo() {
+  const cfg = loadFirebaseConfig();
+  const el = document.getElementById('connInfo');
+  const si = document.getElementById('sheetId');
+  if (cfg && cfg.projectId) {
+    if (el) el.textContent = 'Connecté au projet Firebase : ' + cfg.projectId;
+    if (si) si.value = cfg.projectId;
+  } else {
+    if (el) el.textContent = 'Non configuré — cliquez sur « Reconfigurer »';
+    if (si) si.value = '';
+  }
+}
+
+// ─────────────────────────────────────────────────────────
+// CALCUL HEURES SUPP (portage exact de Code.gs)
+// ─────────────────────────────────────────────────────────
+
+function round_(n, digits) {
+  const p = Math.pow(10, digits || 2);
+  return Math.round((Number(n) + Number.EPSILON) * p) / p;
+}
+
+function isQuarterHour(t) {
+  const m = Number(String(t).split(':')[1]);
+  return [0, 15, 30, 45].includes(m);
+}
+
+function parseLocalDateTime(dateStr, timeStr) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const [hh, mm] = timeStr.split(':').map(Number);
+  return new Date(y, m - 1, d, hh, mm, 0, 0);
+}
+
+function easterSunday(year) {
+  const a = year % 19;
+  const b = Math.floor(year / 100);
+  const c = year % 100;
+  const d = Math.floor(b / 4);
+  const e = b % 4;
+  const f = Math.floor((b + 8) / 25);
+  const g = Math.floor((b - f + 1) / 3);
+  const h = (19 * a + b - d - g + 15) % 30;
+  const i = Math.floor(c / 4);
+  const k = c % 4;
+  const l = (32 + 2 * e + 2 * i - h - k) % 7;
+  const mm2 = Math.floor((a + 11 * h + 22 * l) / 451);
+  const month = Math.floor((h + l - 7 * mm2 + 114) / 31);
+  const day = ((h + l - 7 * mm2 + 114) % 31) + 1;
+  return new Date(year, month - 1, day);
+}
+
+function addDays(date0, days) {
+  const dt = new Date(date0.getFullYear(), date0.getMonth(), date0.getDate());
+  dt.setDate(dt.getDate() + days);
+  return dt;
+}
+
+function sameDay(a, b) {
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+}
+
+function isFrenchHoliday(date0) {
+  const y = date0.getFullYear();
+  const m = date0.getMonth() + 1;
+  const d = date0.getDate();
+  const fixed = [[1,1],[5,1],[5,8],[7,14],[8,15],[11,1],[11,11],[12,25]];
+  for (const [fm, fd] of fixed) {
+    if (m === fm && d === fd) return true;
+  }
+  const easter = easterSunday(y);
+  const easterMonday = addDays(easter, 1);
+  const ascension = addDays(easter, 39);
+  const whitMonday = addDays(easter, 50);
+  return sameDay(date0, easterMonday) || sameDay(date0, ascension) || sameDay(date0, whitMonday);
+}
+
+function multiplierForSegment(a) {
+  const d0 = new Date(a.getFullYear(), a.getMonth(), a.getDate());
+  if (isFrenchHoliday(d0)) return 2.0;
+  if (a.getHours() >= 22) return 2.0;
+  if (d0.getDay() === 0) return 1.667;
+  return 1.0;
+}
+
+function fmtTime(dt) {
+  return String(dt.getHours()).padStart(2,'0') + ':' + String(dt.getMinutes()).padStart(2,'0');
+}
+function fmtDate(dt) {
+  return dt.getFullYear() + '-' + String(dt.getMonth()+1).padStart(2,'0') + '-' + String(dt.getDate()).padStart(2,'0');
+}
+
+function segmentLabel(a, b, mult) {
+  const d = fmtDate(a);
+  const aT = fmtTime(a);
+  const bT = fmtTime(b);
+  const d0 = new Date(a.getFullYear(), a.getMonth(), a.getDate());
+  const parts = [d, `${aT}-${bT}`];
+  if (isFrenchHoliday(d0)) parts.push('jour férié');
+  else if (mult === 2.0) parts.push('après 22h');
+  else if (d0.getDay() === 0 && mult === 1.667) parts.push('dimanche');
+  else parts.push('standard');
+  return parts.join(' ');
+}
+
+function computeOvertime(dateStr, startStr, endStr) {
+  const start = parseLocalDateTime(dateStr, startStr);
+  let end = parseLocalDateTime(dateStr, endStr);
+  if (end.getTime() <= start.getTime()) {
+    end = new Date(end.getTime() + 24 * 60 * 60 * 1000);
+  }
+
+  const cuts = [start.getTime(), end.getTime()];
+  // minuit cuts
+  let cur = new Date(start.getTime()); cur.setHours(24,0,0,0);
+  while (cur.getTime() < end.getTime()) { cuts.push(cur.getTime()); cur = new Date(cur.getTime() + 86400000); }
+  // 22h cuts
+  let day = new Date(start.getTime()); day.setHours(0,0,0,0);
+  while (day.getTime() <= end.getTime()) {
+    const cut = new Date(day.getTime()); cut.setHours(22,0,0,0);
+    if (cut.getTime() > start.getTime() && cut.getTime() < end.getTime()) cuts.push(cut.getTime());
+    day = new Date(day.getTime() + 86400000);
+  }
+
+  const uniq = Array.from(new Set(cuts)).sort((a,b) => a - b);
+  let realHours = 0, countedHours = 0;
+  const segDetails = [];
+
+  for (let i = 0; i < uniq.length - 1; i++) {
+    const a = new Date(uniq[i]);
+    const b2 = new Date(uniq[i+1]);
+    if (b2.getTime() <= a.getTime()) continue;
+    const durH = (b2.getTime() - a.getTime()) / 3600000;
+    const mult = multiplierForSegment(a);
+    realHours += durH;
+    countedHours += durH * mult;
+    segDetails.push(`${segmentLabel(a, b2, mult)}: ${round_(durH, 3)}h × ${mult}`);
+  }
+
+  return { realHours: round_(realHours, 3), countedHours: round_(countedHours, 3), detail: segDetails.join(' | ') };
+}
+
+// ─────────────────────────────────────────────────────────
+// FIREBASE — CRUD
+// ─────────────────────────────────────────────────────────
+
+async function addOvertime(payload) {
+  const { date: dateStr, start: startStr, end: endStr, comment } = payload;
+  const calc = computeOvertime(dateStr, startStr, endStr);
+  const year = Number(dateStr.slice(0, 4));
+  const now = new Date().toISOString();
+
+  await db.collection('heuressupp').add({
+    horodatage: now,
+    date: dateStr,
+    annee: year,
+    debut: startStr,
+    fin: endStr,
+    dureeReelle: calc.realHours,
+    dureeComptabilisee: calc.countedHours,
+    detail: calc.detail,
+    commentaire: comment || ''
+  });
+}
+
+async function addRecup(payload) {
+  const { date: dateStr, hours, comment } = payload;
+  const year = Number(dateStr.slice(0, 4));
+  const now = new Date().toISOString();
+  await db.collection('recups').add({
+    horodatage: now,
+    date: dateStr,
+    annee: year,
+    heures: round_(Number(hours), 3),
+    commentaire: comment || ''
+  });
+}
+
+async function getSummary() {
+  const [snapO, snapR] = await Promise.all([
+    db.collection('heuressupp').orderBy('date', 'desc').get(),
+    db.collection('recups').orderBy('date', 'desc').get()
+  ]);
+
+  let totalReal = 0, totalCounted = 0;
+  const overtimeRows = [];
+  snapO.forEach(doc => {
+    const d = doc.data();
+    totalReal += Number(d.dureeReelle || 0);
+    totalCounted += Number(d.dureeComptabilisee || 0);
+    overtimeRows.push(d);
+  });
+
+  let totalRecup = 0;
+  const recupRows = [];
+  snapR.forEach(doc => {
+    const d = doc.data();
+    totalRecup += Number(d.heures || 0);
+    recupRows.push(d);
+  });
+
+  // Trier par date décroissante pour les 10 derniers
+  overtimeRows.sort((a,b) => (b.date+b.debut) > (a.date+a.debut) ? 1 : -1);
+  recupRows.sort((a,b) => b.date > a.date ? 1 : -1);
+
+  return {
+    totals: {
+      overtimeReal: round_(totalReal, 3),
+      overtimeCounted: round_(totalCounted, 3),
+      recupTaken: round_(totalRecup, 3),
+      balance: round_(totalCounted - totalRecup, 3)
+    },
+    lastOvertime: overtimeRows.slice(0, 10),
+    lastRecup: recupRows.slice(0, 10)
+  };
+}
+
+// ─────────────────────────────────────────────────────────
+// UI — FORMAT & RENDER
+// ─────────────────────────────────────────────────────────
+
+function fmt(n) {
+  if (n === null || n === undefined) return '—';
+  const v = Number(n);
+  if (!isFinite(v)) return '—';
+  const totalMinutes = Math.round(v * 60);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  if (minutes === 0) return hours + 'h';
+  return hours + 'h' + String(minutes).padStart(2, '0');
+}
+
+function escapeHtml(s) {
+  return String(s)
+    .replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;')
+    .replaceAll('"','&quot;').replaceAll("'","&#039;");
+}
+
+function setKPIs(totals) {
+  document.getElementById('kpiReal').textContent = fmt(totals.overtimeReal);
+  document.getElementById('kpiCounted').textContent = fmt(totals.overtimeCounted);
+  document.getElementById('kpiRecup').textContent = fmt(totals.recupTaken);
+  document.getElementById('kpiBalance').textContent = fmt(totals.balance);
+}
+
+function renderOvertimeLogs(rows) {
+  const el = document.getElementById('logOvertime');
+  if (!rows || rows.length === 0) { el.textContent = 'Aucun log.'; return; }
+  el.innerHTML = rows.map(r => `
+    <div class="log-item">
+      <div><span class="mono">${escapeHtml(r.date)}</span> (<span class="mono">${escapeHtml(String(r.annee))}</span>) — <span class="mono">${escapeHtml(r.debut)}</span> → <span class="mono">${escapeHtml(r.fin)}</span></div>
+      <div class="muted">Réel: <b>${escapeHtml(fmt(r.dureeReelle))}</b> · Comptabilisé: <b>${escapeHtml(fmt(r.dureeComptabilisee))}</b></div>
+      <div class="small-note">${escapeHtml(String(r.detail || ''))}</div>
+      ${r.commentaire ? `<div class="small-note"><i>${escapeHtml(String(r.commentaire))}</i></div>` : ''}
+    </div>
+  `).join('');
+}
+
+function renderRecupLogs(rows) {
+  const el = document.getElementById('logRecup');
+  if (!rows || rows.length === 0) { el.textContent = 'Aucun log.'; return; }
+  el.innerHTML = rows.map(r => `
+    <div class="log-item">
+      <div><span class="mono">${escapeHtml(r.date)}</span> (<span class="mono">${escapeHtml(String(r.annee))}</span>) — <b>${escapeHtml(fmt(r.heures))}</b></div>
+      ${r.commentaire ? `<div class="small-note"><i>${escapeHtml(String(r.commentaire))}</i></div>` : ''}
+    </div>
+  `).join('');
+}
+
+function toast(msg, cls) { M.toast({ html: msg, classes: cls || '' }); }
+
+function fillNow(prefix) {
+  const d = new Date();
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth()+1).padStart(2,'0');
+  const dd = String(d.getDate()).padStart(2,'0');
+  document.getElementById(prefix+'Date').value = `${yyyy}-${mm}-${dd}`;
+}
+
+async function refresh() {
+  if (!db) {
+    document.getElementById('logOvertime').textContent = 'Firebase non configuré.';
+    document.getElementById('logRecup').textContent = 'Firebase non configuré.';
+    return;
+  }
+  document.getElementById('logOvertime').textContent = 'Chargement…';
+  document.getElementById('logRecup').textContent = 'Chargement…';
+  try {
+    const data = await getSummary();
+    setKPIs(data.totals);
+    renderOvertimeLogs(data.lastOvertime);
+    renderRecupLogs(data.lastRecup);
+  } catch(e) {
+    const msg = 'Erreur : ' + (e.message || String(e));
+    document.getElementById('logOvertime').textContent = msg;
+    document.getElementById('logRecup').textContent = msg;
+    toast(msg, 'red lighten-2');
+  }
+}
+
+async function submitOvertime() {
+  if (!db) { toast('Firebase non configuré.', 'red lighten-2'); return; }
+  const payload = {
+    date: document.getElementById('otDate').value,
+    start: document.getElementById('otStart').value,
+    end: document.getElementById('otEnd').value,
+    comment: document.getElementById('otComment').value
+  };
+  if (!payload.date) { toast('Date requise.', 'red lighten-2'); return; }
+  if (!payload.start || !payload.end) { toast('Début et fin requis.', 'red lighten-2'); return; }
+  if (!isQuarterHour(payload.start) || !isQuarterHour(payload.end)) {
+    toast('Heures uniquement par tranches de 15 minutes (00/15/30/45).', 'red lighten-2'); return;
+  }
+  try {
+    await addOvertime(payload);
+    toast('Heures supp enregistrées.', 'green lighten-1');
+    document.getElementById('otComment').value = '';
+    await refresh();
+  } catch(e) {
+    toast(e.message || String(e), 'red lighten-2');
+  }
+}
+
+async function submitRecup() {
+  if (!db) { toast('Firebase non configuré.', 'red lighten-2'); return; }
+  const payload = {
+    date: document.getElementById('reDate').value,
+    hours: document.getElementById('reHours').value,
+    comment: document.getElementById('reComment').value
+  };
+  if (!payload.date) { toast('Date requise.', 'red lighten-2'); return; }
+  if (!payload.hours || Number(payload.hours) <= 0) { toast('Heures invalides.', 'red lighten-2'); return; }
+  try {
+    await addRecup(payload);
+    toast('Récup enregistrée.', 'green lighten-1');
+    document.getElementById('reHours').value = '';
+    document.getElementById('reComment').value = '';
+    await refresh();
+  } catch(e) {
+    toast(e.message || String(e), 'red lighten-2');
+  }
+}
+
+// ─────────────────────────────────────────────────────────
+// EXPORT PDF (jsPDF — portage exact de Code.gs)
+// ─────────────────────────────────────────────────────────
+
+function formatHoursMinutes(hoursDec) {
+  const v = Number(hoursDec);
+  if (!isFinite(v)) return '';
+  const totalMinutes = Math.round(v * 60);
+  const h = Math.floor(totalMinutes / 60);
+  const m = totalMinutes % 60;
+  if (m === 0) return `${h}h`;
+  return `${h}h${String(m).padStart(2,'0')}`;
+}
+
+async function exportPdf() {
+  if (!db) { toast('Firebase non configuré.', 'red lighten-2'); return; }
+  const yearVal = document.getElementById('pdfYear').value;
+  const year = yearVal ? Number(yearVal) : null;
+  document.getElementById('pdfResult').innerHTML = '';
+  toast('Génération du PDF…', '');
+
+  try {
+    const snap = await db.collection('heuressupp').orderBy('date').get();
+    let rows = [];
+    snap.forEach(doc => rows.push(doc.data()));
+    if (year) rows = rows.filter(r => Number(r.annee) === year);
+
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+
+    // Titre
+    doc.setFontSize(18); doc.setFont(undefined, 'bold');
+    doc.text("Heures supplémentaires d'Anthony Lemoine", 14, 20);
+    doc.setFontSize(12); doc.setFont(undefined, 'bold');
+    doc.text(year ? `Année : ${year}` : 'Toutes années', 14, 29);
+    doc.setFontSize(10); doc.setFont(undefined, 'normal'); doc.setTextColor(85,85,85);
+    const now = new Date();
+    const gen = `Généré le ${String(now.getDate()).padStart(2,'0')}/${String(now.getMonth()+1).padStart(2,'0')}/${now.getFullYear()} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+    doc.text(gen, 14, 36);
+    doc.setTextColor(0,0,0);
+
+    const tableRows = rows.length > 0
+      ? rows.map(r => [
+          String(r.detail || ''),
+          formatHoursMinutes(r.dureeReelle),
+          formatHoursMinutes(r.dureeComptabilisee),
+          String(r.commentaire || '')
+        ])
+      : [['Aucune donnée.', '', '', '']];
+
+    doc.autoTable({
+      startY: 42,
+      head: [['Détail', 'Durée réelle', 'Durée comptabilisée', 'Commentaire']],
+      body: tableRows,
+      theme: 'grid',
+      headStyles: { fillColor: [31,41,55], textColor: 255, fontStyle: 'bold', halign: 'center', fontSize: 9 },
+      columnStyles: {
+        0: { cellWidth: 90, halign: 'left', fontSize: 7 },
+        1: { cellWidth: 28, halign: 'center', fontSize: 9 },
+        2: { cellWidth: 36, halign: 'center', fontSize: 9 },
+        3: { cellWidth: 'auto', halign: 'left', fontSize: 9 }
+      },
+      alternateRowStyles: { fillColor: [243,244,246] },
+      margin: { left: 9, right: 9 },
+      styles: { overflow: 'linebreak', cellPadding: 3, lineColor: [209,213,219] }
+    });
+
+    // Numéros de page
+    const pageCount = doc.internal.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.setFontSize(8); doc.setTextColor(100);
+      doc.text(`Page ${i} / ${pageCount}`, doc.internal.pageSize.getWidth() - 20, doc.internal.pageSize.getHeight() - 6);
+    }
+
+    const ts = now.getFullYear() + String(now.getMonth()+1).padStart(2,'0') + String(now.getDate()).padStart(2,'0')
+      + '_' + String(now.getHours()).padStart(2,'0') + String(now.getMinutes()).padStart(2,'0');
+    const filename = `Anthony_Lemoine_HeuresSupp_${ts}.pdf`;
+    doc.save(filename);
+
+    document.getElementById('pdfResult').innerHTML = `<span style="color:#16a34a;">✓ PDF téléchargé : ${escapeHtml(filename)}</span>`;
+    toast('PDF prêt.', 'green lighten-1');
+  } catch(e) {
+    toast(e.message || String(e), 'red lighten-2');
+  }
+}
+
+// ─────────────────────────────────────────────────────────
+// INIT
+// ─────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', function() {
+  M.Tabs.init(document.querySelectorAll('.tabs'));
+  fillNow('ot'); fillNow('re');
+  document.getElementById('pdfYear').value = new Date().getFullYear();
+
+  const cfg = loadFirebaseConfig();
+  if (cfg && cfg.apiKey && cfg.projectId && cfg.appId) {
+    const ok = initFirebase(cfg);
+    if (ok) {
+      updateConnInfo();
+      refresh();
+    } else {
+      openConfigModal();
+    }
+  } else {
+    openConfigModal();
+  }
+});
+</script>
+</body>
+</html>
