@@ -100,14 +100,14 @@
 <div id="configModal" style="display:none;">
   <div class="modal-box">
     <h5><i class="material-icons" style="vertical-align:middle;margin-right:6px;font-size:1.2rem;">settings</i>Configuration Firebase</h5>
-    <p>Renseignez les paramètres de votre projet Firebase. Ces valeurs sont stockées dans votre navigateur et ne seront demandées qu'<strong>une seule fois</strong>.</p>
+    <p>Renseignez les paramètres de votre projet Firebase. Ces valeurs sont stockées dans votre navigateur et ne seront demandées qu'<strong>une seule fois</strong>. La vérification des accès se fera après votre connexion Google.</p>
     <div class="row" style="margin-bottom:0;">
       <div class="col s12"><div class="input-field"><input id="cfg_apiKey" type="text" class="mono"><label class="active" for="cfg_apiKey">API Key</label></div></div>
       <div class="col s12"><div class="input-field"><input id="cfg_projectId" type="text" class="mono"><label class="active" for="cfg_projectId">Project ID</label></div></div>
       <div class="col s12"><div class="input-field"><input id="cfg_appId" type="text" class="mono"><label class="active" for="cfg_appId">App ID</label></div></div>
     </div>
     <div id="configStatus" class="config-status" style="display:none;"></div>
-    <div class="actions"><button class="btn" onclick="saveFirebaseConfig()">Enregistrer et continuer</button></div>
+    <div class="actions"><button class="btn" onclick="saveFirebaseConfig()">Enregistrer et se connecter avec Google</button></div>
   </div>
 </div>
 
@@ -255,12 +255,13 @@ async function saveFirebaseConfig(){
   if(!cfg.apiKey||!cfg.projectId||!cfg.appId){showConfigStatus('Tous les champs sont requis.',false);return;}
   const ok=initFirebase(cfg);
   if(!ok){showConfigStatus('Erreur initialisation Firebase.',false);return;}
-  try{
-    await db.collection('heuressupp').limit(1).get();
-    storeFirebaseConfig(cfg);
-    showConfigStatus('Connexion réussie !',true);
-    setTimeout(()=>{document.getElementById('configModal').style.display='none';startAuthFlow();},800);
-  }catch(e){showConfigStatus('Erreur : '+(e.message||String(e)),false);}
+  storeFirebaseConfig(cfg);
+  showConfigStatus('Configuration enregistrée. Connectez-vous maintenant avec Google.',true);
+  setTimeout(()=>{
+    document.getElementById('configModal').style.display='none';
+    startAuthFlow();
+    showLoginScreen();
+  },500);
 }
 
 function startAuthFlow(){
