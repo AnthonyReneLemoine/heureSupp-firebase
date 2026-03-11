@@ -78,6 +78,8 @@
 
     .user-avatar { width:32px; height:32px; border-radius:50%; object-fit:cover; border:2px solid #e5e7eb; }
     .user-name { font-size:0.85rem; opacity:0.75; }
+    .edit-hint { margin-top:8px; font-size:0.85rem; color:#b45309; }
+    .log-item-top { display:flex; justify-content:space-between; gap:8px; align-items:flex-start; flex-wrap:wrap; }
   </style>
 </head>
 <body>
@@ -156,9 +158,11 @@
         <div class="col s12">
           <div class="right-actions">
             <a class="btn-flat" href="javascript:void(0)" onclick="fillNow('ot')">Mettre aujourd'hui</a>
-            <button class="btn" onclick="submitOvertime()">Enregistrer</button>
+            <button class="btn" id="otSubmitBtn" onclick="submitOvertime()">Enregistrer</button>
+            <button class="btn-flat" id="otCancelEditBtn" style="display:none;" onclick="cancelOvertimeEdit()">Annuler la modification</button>
           </div>
           <div class="hint muted" style="margin-top:10px;">Si la fin est inférieure ou égale au début, le créneau est considéré comme passant minuit.</div>
+          <div id="otEditHint" class="edit-hint" style="display:none;"></div>
         </div>
       </div>
     </div>
@@ -171,9 +175,11 @@
         <div class="col s12">
           <div class="right-actions">
             <a class="btn-flat" href="javascript:void(0)" onclick="fillNow('re')">Mettre aujourd'hui</a>
-            <button class="btn" onclick="submitRecup()">Enregistrer</button>
+            <button class="btn" id="reSubmitBtn" onclick="submitRecup()">Enregistrer</button>
+            <button class="btn-flat" id="reCancelEditBtn" style="display:none;" onclick="cancelRecupEdit()">Annuler la modification</button>
           </div>
           <div class="hint muted" style="margin-top:10px;">Saisir en heures « comptabilisées » (équivalent), pas en heures réelles.</div>
+          <div id="reEditHint" class="edit-hint" style="display:none;"></div>
         </div>
       </div>
     </div>
@@ -220,6 +226,8 @@
 'use strict';
 const LS_KEY = 'hsrecup_firebase_cfg';
 let db = null, auth = null, currentUser = null;
+let editingOvertimeId = null, editingRecupId = null;
+let overtimeById = {}, recupById = {};
 
 function loadFirebaseConfig(){ try{return JSON.parse(localStorage.getItem(LS_KEY)||'null');}catch(e){return null;} }
 function storeFirebaseConfig(cfg){ localStorage.setItem(LS_KEY, JSON.stringify(cfg)); }
@@ -341,11 +349,13 @@ function computeOvertime(ds,ss,es){
 function uid(){return currentUser?currentUser.uid:null;}
 async function addOvertime(p){const c=computeOvertime(p.date,p.start,p.end);await db.collection('heuressupp').add({uid:uid(),horodatage:new Date().toISOString(),date:p.date,annee:Number(p.date.slice(0,4)),debut:p.start,fin:p.end,dureeReelle:c.realHours,dureeComptabilisee:c.countedHours,detail:c.detail,commentaire:p.comment||''});}
 async function addRecup(p){await db.collection('recups').add({uid:uid(),horodatage:new Date().toISOString(),date:p.date,annee:Number(p.date.slice(0,4)),heures:round_(Number(p.hours),3),commentaire:p.comment||''});}
+async function updateOvertime(id,p){const c=computeOvertime(p.date,p.start,p.end);await db.collection('heuressupp').doc(id).update({date:p.date,annee:Number(p.date.slice(0,4)),debut:p.start,fin:p.end,dureeReelle:c.realHours,dureeComptabilisee:c.countedHours,detail:c.detail,commentaire:p.comment||''});}
+async function updateRecup(id,p){await db.collection('recups').doc(id).update({date:p.date,annee:Number(p.date.slice(0,4)),heures:round_(Number(p.hours),3),commentaire:p.comment||''});}
 async function getSummary(){
   const u=uid();
   const[sO,sR]=await Promise.all([db.collection('heuressupp').where('uid','==',u).get(),db.collection('recups').where('uid','==',u).get()]);
-  let tR=0,tC=0;const oR=[];sO.forEach(d=>{const v=d.data();tR+=Number(v.dureeReelle||0);tC+=Number(v.dureeComptabilisee||0);oR.push(v);});
-  let tRc=0;const rR=[];sR.forEach(d=>{const v=d.data();tRc+=Number(v.heures||0);rR.push(v);});
+  let tR=0,tC=0;const oR=[];sO.forEach(d=>{const v=d.data();tR+=Number(v.dureeReelle||0);tC+=Number(v.dureeComptabilisee||0);oR.push({...v,id:d.id});});
+  let tRc=0;const rR=[];sR.forEach(d=>{const v=d.data();tRc+=Number(v.heures||0);rR.push({...v,id:d.id});});
   oR.sort((a,b)=>(b.date+b.debut)>(a.date+a.debut)?1:-1);rR.sort((a,b)=>b.date>a.date?1:-1);
   return{totals:{overtimeReal:round_(tR,3),overtimeCounted:round_(tC,3),recupTaken:round_(tRc,3),balance:round_(tC-tRc,3)},lastOvertime:oR.slice(0,10),lastRecup:rR.slice(0,10)};
 }
@@ -354,15 +364,53 @@ async function getSummary(){
 function fmt(n){if(n==null)return'—';const v=Number(n);if(!isFinite(v))return'—';const t=Math.round(v*60),h=Math.floor(t/60),m=t%60;return m===0?h+'h':h+'h'+String(m).padStart(2,'0');}
 function esc(s){return String(s).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'","&#039;");}
 function setKPIs(t){document.getElementById('kpiReal').textContent=fmt(t.overtimeReal);document.getElementById('kpiCounted').textContent=fmt(t.overtimeCounted);document.getElementById('kpiRecup').textContent=fmt(t.recupTaken);document.getElementById('kpiBalance').textContent=fmt(t.balance);}
-function renderOvertimeLogs(rows){const el=document.getElementById('logOvertime');if(!rows||!rows.length){el.textContent='Aucun log.';return;}el.innerHTML=rows.map(r=>`<div class="log-item"><div><span class="mono">${esc(r.date)}</span> (<span class="mono">${esc(String(r.annee))}</span>) — <span class="mono">${esc(r.debut)}</span> → <span class="mono">${esc(r.fin)}</span></div><div class="muted">Réel : <b>${esc(fmt(r.dureeReelle))}</b> · Comptabilisé : <b>${esc(fmt(r.dureeComptabilisee))}</b></div><div class="small-note">${esc(String(r.detail||''))}</div>${r.commentaire?`<div class="small-note"><i>${esc(String(r.commentaire))}</i></div>`:''}</div>`).join('');}
-function renderRecupLogs(rows){const el=document.getElementById('logRecup');if(!rows||!rows.length){el.textContent='Aucun log.';return;}el.innerHTML=rows.map(r=>`<div class="log-item"><div><span class="mono">${esc(r.date)}</span> (<span class="mono">${esc(String(r.annee))}</span>) — <b>${esc(fmt(r.heures))}</b></div>${r.commentaire?`<div class="small-note"><i>${esc(String(r.commentaire))}</i></div>`:''}</div>`).join('');}
+function openTab(tabId){const link=document.querySelector(`a[href="#${tabId}"]`);if(link)link.click();}
+function setOvertimeEditMode(row){
+  editingOvertimeId=row?row.id:null;
+  document.getElementById('otSubmitBtn').textContent=row?'Mettre à jour':'Enregistrer';
+  document.getElementById('otCancelEditBtn').style.display=row?'inline-flex':'none';
+  const hint=document.getElementById('otEditHint');
+  if(row){hint.style.display='block';hint.textContent=`Modification du journal du ${row.date} (${row.debut} → ${row.fin}).`;}
+  else{hint.style.display='none';hint.textContent='';}
+}
+function setRecupEditMode(row){
+  editingRecupId=row?row.id:null;
+  document.getElementById('reSubmitBtn').textContent=row?'Mettre à jour':'Enregistrer';
+  document.getElementById('reCancelEditBtn').style.display=row?'inline-flex':'none';
+  const hint=document.getElementById('reEditHint');
+  if(row){hint.style.display='block';hint.textContent=`Modification de la récup du ${row.date}.`;}
+  else{hint.style.display='none';hint.textContent='';}
+}
+function startEditOvertime(id){
+  const row=overtimeById[id];
+  if(!row){toast('Journal introuvable, rechargez la liste.','red lighten-2');return;}
+  document.getElementById('otDate').value=row.date||'';
+  document.getElementById('otStart').value=row.debut||'';
+  document.getElementById('otEnd').value=row.fin||'';
+  document.getElementById('otComment').value=row.commentaire||'';
+  setOvertimeEditMode(row);
+  openTab('tabOvertime');
+}
+function startEditRecup(id){
+  const row=recupById[id];
+  if(!row){toast('Journal introuvable, rechargez la liste.','red lighten-2');return;}
+  document.getElementById('reDate').value=row.date||'';
+  document.getElementById('reHours').value=row.heures!=null?String(row.heures):'';
+  document.getElementById('reComment').value=row.commentaire||'';
+  setRecupEditMode(row);
+  openTab('tabRecup');
+}
+function cancelOvertimeEdit(){setOvertimeEditMode(null);document.getElementById('otComment').value='';}
+function cancelRecupEdit(){setRecupEditMode(null);document.getElementById('reComment').value='';}
+function renderOvertimeLogs(rows){const el=document.getElementById('logOvertime');if(!rows||!rows.length){el.textContent='Aucun log.';return;}el.innerHTML=rows.map(r=>`<div class="log-item"><div class="log-item-top"><div><span class="mono">${esc(r.date)}</span> (<span class="mono">${esc(String(r.annee))}</span>) — <span class="mono">${esc(r.debut)}</span> → <span class="mono">${esc(r.fin)}</span></div><a class="btn-flat" href="javascript:void(0)" onclick="startEditOvertime('${esc(r.id)}')">Modifier</a></div><div class="muted">Réel : <b>${esc(fmt(r.dureeReelle))}</b> · Comptabilisé : <b>${esc(fmt(r.dureeComptabilisee))}</b></div><div class="small-note">${esc(String(r.detail||''))}</div>${r.commentaire?`<div class="small-note"><i>${esc(String(r.commentaire))}</i></div>`:''}</div>`).join('');}
+function renderRecupLogs(rows){const el=document.getElementById('logRecup');if(!rows||!rows.length){el.textContent='Aucun log.';return;}el.innerHTML=rows.map(r=>`<div class="log-item"><div class="log-item-top"><div><span class="mono">${esc(r.date)}</span> (<span class="mono">${esc(String(r.annee))}</span>) — <b>${esc(fmt(r.heures))}</b></div><a class="btn-flat" href="javascript:void(0)" onclick="startEditRecup('${esc(r.id)}')">Modifier</a></div>${r.commentaire?`<div class="small-note"><i>${esc(String(r.commentaire))}</i></div>`:''}</div>`).join('');}
 function toast(msg,cls){M.toast({html:msg,classes:cls||''});}
 function fillNow(p){const d=new Date();document.getElementById(p+'Date').value=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
 
 async function refresh(){
   if(!db||!currentUser){document.getElementById('logOvertime').textContent='Non connecté.';document.getElementById('logRecup').textContent='Non connecté.';return;}
   document.getElementById('logOvertime').textContent='Chargement…';document.getElementById('logRecup').textContent='Chargement…';
-  try{const data=await getSummary();setKPIs(data.totals);renderOvertimeLogs(data.lastOvertime);renderRecupLogs(data.lastRecup);}
+  try{const data=await getSummary();overtimeById=Object.fromEntries((data.lastOvertime||[]).map(r=>[r.id,r]));recupById=Object.fromEntries((data.lastRecup||[]).map(r=>[r.id,r]));setKPIs(data.totals);renderOvertimeLogs(data.lastOvertime);renderRecupLogs(data.lastRecup);}
   catch(e){const m='Erreur : '+(e.message||String(e));document.getElementById('logOvertime').textContent=m;document.getElementById('logRecup').textContent=m;toast(m,'red lighten-2');}
 }
 
@@ -372,7 +420,7 @@ async function submitOvertime(){
   if(!p.date){toast('Date requise.','red lighten-2');return;}
   if(!p.start||!p.end){toast('Début et fin requis.','red lighten-2');return;}
   if(!isQuarterHour(p.start)||!isQuarterHour(p.end)){toast('Heures uniquement par tranches de 15 minutes (00/15/30/45).','red lighten-2');return;}
-  try{await addOvertime(p);toast('Heures supp enregistrées.','green lighten-1');document.getElementById('otComment').value='';await refresh();}
+  try{if(editingOvertimeId){await updateOvertime(editingOvertimeId,p);toast('Journal heures supp modifié.','green lighten-1');setOvertimeEditMode(null);}else{await addOvertime(p);toast('Heures supp enregistrées.','green lighten-1');}document.getElementById('otComment').value='';await refresh();}
   catch(e){toast(e.message||String(e),'red lighten-2');}
 }
 
@@ -381,7 +429,7 @@ async function submitRecup(){
   const p={date:document.getElementById('reDate').value,hours:document.getElementById('reHours').value,comment:document.getElementById('reComment').value};
   if(!p.date){toast('Date requise.','red lighten-2');return;}
   if(!p.hours||Number(p.hours)<=0){toast('Heures invalides.','red lighten-2');return;}
-  try{await addRecup(p);toast('Récup enregistrée.','green lighten-1');document.getElementById('reHours').value='';document.getElementById('reComment').value='';await refresh();}
+  try{if(editingRecupId){await updateRecup(editingRecupId,p);toast('Journal récup modifié.','green lighten-1');setRecupEditMode(null);}else{await addRecup(p);toast('Récup enregistrée.','green lighten-1');document.getElementById('reHours').value='';}document.getElementById('reComment').value='';await refresh();}
   catch(e){toast(e.message||String(e),'red lighten-2');}
 }
 
