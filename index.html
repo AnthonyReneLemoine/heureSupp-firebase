@@ -136,7 +136,7 @@
         <div class="k"><div class="label">Récup prises</div><div class="val mono" id="kpiRecup">—</div></div>
         <div class="k"><div class="label">Solde</div><div class="val mono" id="kpiBalance">—</div></div>
       </div>
-      <div class="small-note" style="margin-top:10px;">Règles : jour férié = ×2 ; après 22h = ×2 ; dimanche avant 22h = ×1,667. Saisie : tranches de 15 minutes.</div>
+      <div class="small-note" style="margin-top:10px;">Règles : jour férié = ×2 ; nuit (22h-05h) = ×2 ; dimanche hors nuit = ×1,667. Saisie : tranches de 15 minutes.</div>
     </div>
   </div>
 
@@ -327,10 +327,11 @@ function easterSunday(Y){const a=Y%19,b=Math.floor(Y/100),c=Y%100,d=Math.floor(b
 function addDays(d,n){const dt=new Date(d.getFullYear(),d.getMonth(),d.getDate());dt.setDate(dt.getDate()+n);return dt;}
 function sameDay(a,b){return a.getFullYear()===b.getFullYear()&&a.getMonth()===b.getMonth()&&a.getDate()===b.getDate();}
 function isFrenchHoliday(d0){const y=d0.getFullYear(),m=d0.getMonth()+1,d=d0.getDate();for(const[fm,fd]of[[1,1],[5,1],[5,8],[7,14],[8,15],[11,1],[11,11],[12,25]])if(m===fm&&d===fd)return true;const e=easterSunday(y);return sameDay(d0,addDays(e,1))||sameDay(d0,addDays(e,39))||sameDay(d0,addDays(e,50));}
-function multSeg(a){const d0=new Date(a.getFullYear(),a.getMonth(),a.getDate());if(isFrenchHoliday(d0))return 2.0;if(a.getHours()>=22)return 2.0;if(d0.getDay()===0)return 1.667;return 1.0;}
+function isNightHour(a){const h=a.getHours();return h>=22||h<5;}
+function multSeg(a){const d0=new Date(a.getFullYear(),a.getMonth(),a.getDate());if(isFrenchHoliday(d0))return 2.0;if(isNightHour(a))return 2.0;if(d0.getDay()===0)return 1.667;return 1.0;}
 function ft(dt){return String(dt.getHours()).padStart(2,'0')+':'+String(dt.getMinutes()).padStart(2,'0');}
 function fd(dt){return dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0')+'-'+String(dt.getDate()).padStart(2,'0');}
-function segLabel(a,b2,mult){const d0=new Date(a.getFullYear(),a.getMonth(),a.getDate()),pts=[fd(a),`${ft(a)}-${ft(b2)}`];if(isFrenchHoliday(d0))pts.push('jour férié');else if(mult===2.0)pts.push('après 22h');else if(d0.getDay()===0)pts.push('dimanche');else pts.push('standard');return pts.join(' ');}
+function segLabel(a,b2,mult){const d0=new Date(a.getFullYear(),a.getMonth(),a.getDate()),pts=[fd(a),`${ft(a)}-${ft(b2)}`];if(isFrenchHoliday(d0))pts.push('jour férié');else if(mult===2.0&&isNightHour(a))pts.push('nuit (22h-05h)');else if(mult===2.0)pts.push('majoré');else if(d0.getDay()===0)pts.push('dimanche');else pts.push('standard');return pts.join(' ');}
 function computeOvertime(ds,ss,es){
   const start=parseLocalDateTime(ds,ss);let end=parseLocalDateTime(ds,es);
   if(end.getTime()<=start.getTime())end=new Date(end.getTime()+86400000);
@@ -338,7 +339,13 @@ function computeOvertime(ds,ss,es){
   let cur=new Date(start.getTime());cur.setHours(24,0,0,0);
   while(cur.getTime()<end.getTime()){cuts.push(cur.getTime());cur=new Date(cur.getTime()+86400000);}
   let day=new Date(start.getTime());day.setHours(0,0,0,0);
-  while(day.getTime()<=end.getTime()){const cut=new Date(day.getTime());cut.setHours(22,0,0,0);if(cut.getTime()>start.getTime()&&cut.getTime()<end.getTime())cuts.push(cut.getTime());day=new Date(day.getTime()+86400000);}
+  while(day.getTime()<=end.getTime()){
+    const cut22=new Date(day.getTime());cut22.setHours(22,0,0,0);
+    if(cut22.getTime()>start.getTime()&&cut22.getTime()<end.getTime())cuts.push(cut22.getTime());
+    const cut05=new Date(day.getTime());cut05.setHours(5,0,0,0);
+    if(cut05.getTime()>start.getTime()&&cut05.getTime()<end.getTime())cuts.push(cut05.getTime());
+    day=new Date(day.getTime()+86400000);
+  }
   const uniq=[...new Set(cuts)].sort((a,b)=>a-b);
   let rH=0,cH=0;const segs=[];
   for(let i=0;i<uniq.length-1;i++){const a=new Date(uniq[i]),b2=new Date(uniq[i+1]);if(b2<=a)continue;const dh=(b2-a)/3600000,m=multSeg(a);rH+=dh;cH+=dh*m;segs.push(`${segLabel(a,b2,m)}: ${round_(dh,3)}h × ${m}`);}
