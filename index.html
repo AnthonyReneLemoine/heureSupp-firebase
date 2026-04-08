@@ -20,9 +20,7 @@
     .kpi .k .val { font-size: 1.55rem; font-weight: 700; margin-top: 4px; }
     .muted { opacity: 0.8; }
     .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
-    .logs { display:grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-    @media (max-width: 860px) { .kpi { grid-template-columns: 1fr 1fr; } .logs { grid-template-columns: 1fr; } }
-    @media (max-width: 1000px) { .logs { grid-template-columns: 1fr; } }
+    @media (max-width: 860px) { .kpi { grid-template-columns: 1fr 1fr; } }
     .chip.small { height: 22px; line-height: 22px; font-size: 12px; }
     .input-field input[type=text],.input-field input[type=number],.input-field input[type=date],.input-field input[type=time] {
       background:#fff; border-radius:10px; padding-left:12px; padding-right:12px; box-sizing:border-box; border:1px solid rgba(0,0,0,0.10);
@@ -35,9 +33,21 @@
     .btn,.btn-large { border-radius:12px; text-transform:none; font-weight:700; }
     .btn-flat { border-radius:10px; text-transform:none; }
     .card-title { font-weight:800!important; font-size:1.25rem; line-height:1.35; }
-    .log-card { padding:14px; border-radius:14px; background:#fff; border:1px solid rgba(0,0,0,0.06); overflow:hidden; }
-    .log-item { padding:10px 0; border-bottom:1px solid rgba(0,0,0,0.06); }
-    .log-item:last-child { border-bottom:none; }
+    .logs-topbar { display:flex; align-items:center; gap:10px; margin-bottom:12px; flex-wrap:wrap; }
+    .log-subtabs { display:flex; gap:4px; margin-bottom:14px; background:#f1f5f9; border-radius:12px; padding:4px; }
+    .log-subtab { flex:1; border:none; background:transparent; border-radius:9px; padding:8px 18px; font-weight:600; font-size:0.9rem; cursor:pointer; transition:background .15s,color .15s,box-shadow .15s; color:#64748b; }
+    .log-subtab.active { background:#fff; color:#1f2937; box-shadow:0 1px 5px rgba(0,0,0,0.10); }
+    .log-row { display:flex; align-items:center; gap:8px; padding:8px 10px; border-radius:10px; border-bottom:1px solid rgba(0,0,0,0.055); flex-wrap:wrap; transition:background .1s; }
+    .log-row:hover { background:#f8fafc; }
+    .log-row:last-child { border-bottom:none; }
+    .log-date { font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace; font-size:0.87rem; font-weight:600; color:#374151; min-width:86px; flex-shrink:0; }
+    .log-time { font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace; font-size:0.84rem; color:#6b7280; flex-shrink:0; }
+    .log-badge { font-size:0.77rem; padding:2px 9px; border-radius:6px; font-weight:700; white-space:nowrap; flex-shrink:0; }
+    .log-badge.real { background:#dbeafe; color:#1d4ed8; }
+    .log-badge.counted { background:#d1fae5; color:#065f46; }
+    .log-badge.recup-badge { background:#ede9fe; color:#5b21b6; }
+    .log-comment { font-size:0.82rem; color:#9ca3af; font-style:italic; overflow:hidden; text-overflow:ellipsis; }
+    .log-detail { font-size:0.74rem; color:#b0b8c4; width:100%; padding-left:2px; margin-top:-2px; line-height:1.4; }
     .right-actions { display:flex; gap:10px; justify-content:flex-end; align-items:center; flex-wrap:wrap; }
     .hint { font-size:0.92rem; }
     .small-note { font-size:0.85rem; opacity:0.75; }
@@ -46,10 +56,7 @@
     .export-bar button { white-space:nowrap; }
     .export-link { font-size:0.9rem; }
     .breakall { word-break:break-all; overflow-wrap:anywhere; }
-    .log-header { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; flex-wrap:wrap; }
-    .log-header .titlewrap { flex:1; min-width:220px; }
-    .log-header .actions { flex:0 0 auto; display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
-    .conn-block { margin-top:10px; padding:10px 12px; border-radius:12px; background:#f8fafc; border:1px solid rgba(0,0,0,0.06); }
+    .conn-block { padding:9px 12px; border-radius:12px; background:#f8fafc; border:1px solid rgba(0,0,0,0.06); flex:1; min-width:0; }
 
     /* Écran connexion */
     #loginScreen { position:fixed; inset:0; background:#f5f7fb; z-index:8000; display:flex; align-items:center; justify-content:center; }
@@ -179,30 +186,29 @@
     </div>
 
     <div id="tabLogs" class="card-content">
-      <div class="logs">
-        <div class="log-card">
-          <div class="log-header">
-            <div class="titlewrap"><div class="card-title" style="margin:0;">Heures supp (10 derniers)</div></div>
-            <div class="actions">
-              <a class="btn-flat" href="javascript:void(0)" onclick="refresh()">Rafraîchir</a>
-              <a class="btn-flat" href="javascript:void(0)" onclick="openConfigModal()" title="Reconfigurer Firebase"><i class="material-icons" style="font-size:1rem;vertical-align:middle;">settings</i></a>
-            </div>
-          </div>
-          <div class="conn-block"><div class="small-note breakall" id="connInfo">—</div></div>
-          <div id="logOvertime" class="small-note" style="margin-top:10px;">Chargement…</div>
-          <div class="export-bar">
-            <div class="input-field"><input id="pdfYear" type="number" min="1900" max="3000"><label class="active" for="pdfYear">Année (optionnel)</label></div>
-            <button class="btn" onclick="exportPdf()">Exporter PDF</button>
-          </div>
-          <div id="pdfResult" class="export-link" style="margin-top:8px;"></div>
+      <!-- Barre du haut : connexion + actions -->
+      <div class="logs-topbar">
+        <div class="conn-block"><div class="small-note breakall" id="connInfo">—</div></div>
+        <a class="btn-flat" href="javascript:void(0)" onclick="refresh()" style="flex-shrink:0;">Rafraîchir</a>
+        <a class="btn-flat" href="javascript:void(0)" onclick="openConfigModal()" title="Reconfigurer Firebase" style="flex-shrink:0;"><i class="material-icons" style="font-size:1rem;vertical-align:middle;">settings</i></a>
+      </div>
+      <!-- Sous-onglets -->
+      <div class="log-subtabs">
+        <button class="log-subtab active" id="subtabOtBtn" onclick="switchLogTab('ot')">Heures supp</button>
+        <button class="log-subtab" id="subtabReBtn" onclick="switchLogTab('re')">Récup</button>
+      </div>
+      <!-- Panneau Heures supp -->
+      <div id="logPanelOt">
+        <div id="logOvertime">Chargement…</div>
+        <div class="export-bar">
+          <div class="input-field"><input id="pdfYear" type="number" min="1900" max="3000"><label class="active" for="pdfYear">Année (optionnel)</label></div>
+          <button class="btn" onclick="exportPdf()">Exporter PDF</button>
         </div>
-        <div class="log-card">
-          <div style="display:flex;justify-content:space-between;align-items:center;">
-            <div class="card-title" style="margin:0;">Récup (10 dernières)</div>
-            <a class="btn-flat" href="javascript:void(0)" onclick="refresh()">Rafraîchir</a>
-          </div>
-          <div id="logRecup" class="small-note" style="margin-top:6px;">Chargement…</div>
-        </div>
+        <div id="pdfResult" class="export-link" style="margin-top:8px;"></div>
+      </div>
+      <!-- Panneau Récup -->
+      <div id="logPanelRe" style="display:none;">
+        <div id="logRecup">Chargement…</div>
       </div>
     </div>
   </div>
@@ -353,8 +359,9 @@ async function getSummary(){
 function fmt(n){if(n==null)return'—';const v=Number(n);if(!isFinite(v))return'—';const t=Math.round(v*60),h=Math.floor(t/60),m=t%60;return m===0?h+'h':h+'h'+String(m).padStart(2,'0');}
 function esc(s){return String(s).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'","&#039;");}
 function setKPIs(t){document.getElementById('kpiReal').textContent=fmt(t.overtimeReal);document.getElementById('kpiCounted').textContent=fmt(t.overtimeCounted);document.getElementById('kpiRecup').textContent=fmt(t.recupTaken);document.getElementById('kpiBalance').textContent=fmt(t.balance);}
-function renderOvertimeLogs(rows){const el=document.getElementById('logOvertime');if(!rows||!rows.length){el.textContent='Aucun log.';return;}el.innerHTML=rows.map(r=>`<div class="log-item"><div><span class="mono">${esc(r.date)}</span> (<span class="mono">${esc(String(r.annee))}</span>) — <span class="mono">${esc(r.debut)}</span> → <span class="mono">${esc(r.fin)}</span></div><div class="muted">Réel : <b>${esc(fmt(r.dureeReelle))}</b> · Comptabilisé : <b>${esc(fmt(r.dureeComptabilisee))}</b></div><div class="small-note">${esc(String(r.detail||''))}</div>${r.commentaire?`<div class="small-note"><i>${esc(String(r.commentaire))}</i></div>`:''}</div>`).join('');}
-function renderRecupLogs(rows){const el=document.getElementById('logRecup');if(!rows||!rows.length){el.textContent='Aucun log.';return;}el.innerHTML=rows.map(r=>`<div class="log-item"><div><span class="mono">${esc(r.date)}</span> (<span class="mono">${esc(String(r.annee))}</span>) — <b>${esc(fmt(r.heures))}</b></div>${r.commentaire?`<div class="small-note"><i>${esc(String(r.commentaire))}</i></div>`:''}</div>`).join('');}
+function renderOvertimeLogs(rows){const el=document.getElementById('logOvertime');if(!rows||!rows.length){el.innerHTML='<div class="small-note" style="padding:12px 2px;">Aucun log.</div>';return;}el.innerHTML=rows.map(r=>`<div class="log-row"><span class="log-date">${esc(r.date)}</span><span class="log-time">${esc(r.debut)} → ${esc(r.fin)}</span><span class="log-badge real">réel ${esc(fmt(r.dureeReelle))}</span><span class="log-badge counted">${esc(fmt(r.dureeComptabilisee))}</span>${r.commentaire?`<span class="log-comment">${esc(String(r.commentaire))}</span>`:''}${r.detail?`<span class="log-detail">${esc(String(r.detail))}</span>`:''}</div>`).join('');}
+function renderRecupLogs(rows){const el=document.getElementById('logRecup');if(!rows||!rows.length){el.innerHTML='<div class="small-note" style="padding:12px 2px;">Aucun log.</div>';return;}el.innerHTML=rows.map(r=>`<div class="log-row"><span class="log-date">${esc(r.date)}</span><span class="log-badge recup-badge">${esc(fmt(r.heures))}</span>${r.commentaire?`<span class="log-comment">${esc(String(r.commentaire))}</span>`:''}</div>`).join('');}
+function switchLogTab(tab){document.getElementById('logPanelOt').style.display=tab==='ot'?'':'none';document.getElementById('logPanelRe').style.display=tab==='re'?'':'none';document.getElementById('subtabOtBtn').classList.toggle('active',tab==='ot');document.getElementById('subtabReBtn').classList.toggle('active',tab==='re');}
 function toast(msg,cls){M.toast({html:msg,classes:cls||''});}
 function fillNow(p){const d=new Date();document.getElementById(p+'Date').value=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
 
