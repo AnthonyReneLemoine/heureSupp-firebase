@@ -45,7 +45,7 @@
     .log-row { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:9px 4px; border-bottom:1px solid rgba(0,0,0,0.06); }
     .log-row:last-child { border-bottom:none; }
     .log-row-left { display:flex; align-items:center; gap:8px; flex-wrap:wrap; flex:1; min-width:0; font-size:.87rem; }
-    .log-row-date { font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace; font-weight:700; color:#1f2937; white-space:nowrap; }
+    .log-row-date { font-weight:700; color:#1f2937; white-space:nowrap; }
     .log-row-time { font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace; color:#374151; white-space:nowrap; }
     .log-row-dur { color:#374151; white-space:nowrap; }
     .log-row-arrow { color:#e91e63; font-weight:700; }
@@ -424,6 +424,7 @@ function startEditRecup(id){
 }
 function cancelOvertimeEdit(){setOvertimeEditMode(null);document.getElementById('otComment').value='';}
 function cancelRecupEdit(){setRecupEditMode(null);document.getElementById('reComment').value='';}
+function fmtDateFR(dateStr){if(!dateStr)return dateStr;const[y,m,d]=dateStr.split('-');const dt=new Date(Number(y),Number(m)-1,Number(d));return dt.toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});}
 function openSubTab(id){
   document.querySelectorAll('.sub-tab-panel').forEach(p=>p.style.display='none');
   document.querySelectorAll('.sub-tab-btn').forEach(b=>b.classList.remove('active'));
@@ -435,12 +436,12 @@ function openSubTab(id){
 function renderOvertimeLogs(rows){
   const el=document.getElementById('logOvertime');
   if(!rows||!rows.length){el.innerHTML='<div class="log-empty">Aucun log.</div>';return;}
-  el.innerHTML=rows.map(r=>`<div class="log-row"><div class="log-row-left"><span class="log-row-date">${esc(r.date)}</span><span class="log-row-sep">·</span><span class="log-row-time">${esc(r.debut)}&nbsp;<span class="log-row-arrow">→</span>&nbsp;${esc(r.fin)}</span><span class="log-row-sep">·</span><span class="log-row-dur">Réel&nbsp;<b>${esc(fmt(r.dureeReelle))}</b></span><span class="log-row-sep">·</span><span class="log-row-dur">Compt.&nbsp;<b>${esc(fmt(r.dureeComptabilisee))}</b></span>${r.commentaire?`<span class="log-row-sep">·</span><span class="log-row-comment">${esc(String(r.commentaire))}</span>`:''}</div><a class="btn-flat log-edit-btn" href="javascript:void(0)" onclick="startEditOvertime('${esc(r.id)}')">Modifier</a></div>`).join('');
+  el.innerHTML=rows.map(r=>`<div class="log-row"><div class="log-row-left"><span class="log-row-date">${esc(fmtDateFR(r.date))}</span><span class="log-row-sep">·</span><span class="log-row-time">${esc(r.debut)}&nbsp;<span class="log-row-arrow">→</span>&nbsp;${esc(r.fin)}</span><span class="log-row-sep">·</span><span class="log-row-dur">Réel&nbsp;<b>${esc(fmt(r.dureeReelle))}</b></span><span class="log-row-sep">·</span><span class="log-row-dur">Compt.&nbsp;<b>${esc(fmt(r.dureeComptabilisee))}</b></span>${r.commentaire?`<span class="log-row-sep">·</span><span class="log-row-comment">${esc(String(r.commentaire))}</span>`:''}</div><a class="btn-flat log-edit-btn" href="javascript:void(0)" onclick="startEditOvertime('${esc(r.id)}')">Modifier</a></div>`).join('');
 }
 function renderRecupLogs(rows){
   const el=document.getElementById('logRecup');
   if(!rows||!rows.length){el.innerHTML='<div class="log-empty">Aucun log.</div>';return;}
-  el.innerHTML=rows.map(r=>`<div class="log-row"><div class="log-row-left"><span class="log-row-date">${esc(r.date)}</span><span class="log-row-sep">·</span><span class="log-row-dur"><b>${esc(fmt(r.heures))}</b></span>${r.commentaire?`<span class="log-row-sep">·</span><span class="log-row-comment">${esc(String(r.commentaire))}</span>`:''}</div><a class="btn-flat log-edit-btn" href="javascript:void(0)" onclick="startEditRecup('${esc(r.id)}')">Modifier</a></div>`).join('');
+  el.innerHTML=rows.map(r=>`<div class="log-row"><div class="log-row-left"><span class="log-row-date">${esc(fmtDateFR(r.date))}</span><span class="log-row-sep">·</span><span class="log-row-dur"><b>${esc(fmt(r.heures))}</b></span>${r.commentaire?`<span class="log-row-sep">·</span><span class="log-row-comment">${esc(String(r.commentaire))}</span>`:''}</div><a class="btn-flat log-edit-btn" href="javascript:void(0)" onclick="startEditRecup('${esc(r.id)}')">Modifier</a></div>`).join('');
 }
 function toast(msg,cls){M.toast({html:msg,classes:cls||''});}
 function fillNow(p){const d=new Date();document.getElementById(p+'Date').value=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
